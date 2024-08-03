@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unir Imágenes y Convertir a PDF</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        input[type="file"] {
+            margin: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Unir Imágenes y Convertir a PDF</h1>
+    <input type="file" id="fileInput" multiple accept="image/*">
+    <button onclick="convertToPDF()">Convertir a PDF</button>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script>
+        async function convertToPDF() {
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF();
+            const files = document.getElementById('fileInput').files;
+
+            if (files.length === 0) {
+                alert("Por favor, selecciona al menos una imagen.");
+                return;
+            }
+
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const pageHeight = pdf.internal.pageSize.getHeight();
+
+            let imagePromises = Array.from(files).map(file => {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        const img = new Image();
+                        img.onload = function() {
+                            // Calculate image dimensions
+                            let imgWidth = img.width;
+                            let imgHeight = img.height;
+
+                            // Maintain aspect ratio and resize to fit page
+                            const aspectRatio = imgWidth / imgHeight;
+                            if (imgWidth > pageWidth || imgHeight > pageHeight) {
+                                if (imgWidth > imgHeight) {
+                                    imgWidth = pageWidth;
+                                    imgHeight = imgWidth / aspectRatio;
+                                } else {
+                                    imgHeight = pageHeight;
+                                    imgWidth = imgHeight * aspectRatio;
+                                }
+                            }
+
+                            // Center the image
+                            const xOffset = (pageWidth - imgWidth) / 2;
+                            const yOffset = (pageHeight - imgHeight) / 2;
+
+                            resolve({ imgData: event.target.result, imgWidth, imgHeight, xOffset, yOffset });
+                        };
+                        img.src = event.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                });
+            });
+
+            try {
+                const images = await Promise.all(imagePromises);
+                images.forEach((image, index) => {
+                    if (index > 0) {
+                        pdf.addPage();
+                    }
+                    pdf.addImage(image.imgData, 'JPEG', image.xOffset, image.yOffset, image.imgWidth, image.imgHeight);
+                });
+                pdf.save('imagenes.pdf');
+            } catch (error) {
+                console.error("Error al procesar las imágenes:", error);
+            }
+        }
+    </script>
+</body>
+</html>
